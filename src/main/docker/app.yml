@@ -13,7 +13,17 @@ services:
       - KAFKA_BOOTSTRAPSERVERS=kafka:9092
     ports:
       - 8080:8080
+    depends_on:
+      costsegregationapplication-postgresql:
+        condition: service_healthy
   costsegregationapplication-postgresql:
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 5s
+      timeout: 10s
+      retries: 120
+    depends_on:
+      - kafka
     extends:
       file: postgresql.yml
       service: costsegregationapplication-postgresql
@@ -21,7 +31,15 @@ services:
     extends:
       file: elasticsearch.yml
       service: costsegregationapplication-elasticsearch
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 50
   kafka:
+    depends_on:
+      - zookeeper
+    restart: on-failure
     extends:
       file: kafka.yml
       service: kafka
@@ -29,6 +47,9 @@ services:
       - KAFKA_ADVERTISED_HOST_NAME=kafka
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
   zookeeper:
+    depends_on:
+      costsegregationapplication-elasticsearch:
+        condition: service_healthy
     extends:
       file: kafka.yml
       service: zookeeper
